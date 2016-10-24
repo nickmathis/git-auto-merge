@@ -1,0 +1,68 @@
+#!/usr/bin/env ruby
+module Git
+  class AutoMerge
+    attr_accessor :merged_branches, :skipped_branches
+
+    BASE_BRANCH = 'master'
+
+    def initialize(target_branch)
+      # TODO: sanitize target_branch
+      @target_branch = target_branch
+    end
+
+    # Creates branch if needed and switches to desired branch
+    def provide_branch
+      branches = `git branch --list`
+      if branches.include?(@target_branch)
+        `git co #{@target_branch}`
+      else
+        `git co #{BASE_BRANCH}`
+        `git co -b #{@target_branch}`
+      end
+    end
+
+    def auto_merge(branch_list)
+      @merged_branches = []
+      @skipped_branches = []
+      branch_list.each do |branch|
+        try_merge(branch) ? @merged_branches << branch : @skipped_branches << branch
+      end
+    end
+
+    def try_merge(branch_name)
+      if system("git merge origin/#{branch_name} --no-edit")
+        return true
+      else
+        system("git merge --abort")
+      end
+    end
+  end
+end
+
+# TODO better argument parsing
+target_branch = ARGV[0]
+merge_branches = ARGV[1..(ARGV.count - 1)]
+puts "Building #{target_branch}"
+puts "Merging in #{merge_branches.count} branches"
+am = Git::AutoMerge.new(target_branch)
+am.provide_branch
+am.auto_merge(merge_branches)
+
+am.merged_branches.sort.each do |branch|
+  puts "-- #{branch} (merged)"
+end
+
+am.skipped_branches.sort.each do |branch|
+  puts "-- #{branch} (skipped)"
+end
+
+
+if am.merged_branches.count == merge_branches.count
+  puts "Success! 100% merged"
+else
+  percent_merged = (am.merged_branches.count / merge_branches.count.to_f * 100).to_i
+  puts "Failed! #{percent_merged}% merged"
+end
+
+# TODO try merging in several orders, keeping the best merge out of all for replay
+# start with trying the failed branches first, and keeping the original order after
