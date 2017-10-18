@@ -30,11 +30,12 @@ module Git
     end
 
     def try_merge(branch_name)
-      if system("git merge origin/#{branch_name} --no-edit")
-        return true
-      else
+      ret_val = system("git merge origin/#{branch_name} --no-edit")
+
+      unless ret_val
         system("git merge --abort")
       end
+      ret_val
     end
   end
 end
@@ -54,6 +55,7 @@ end
 
 am.skipped_branches.sort.each do |branch|
   puts "-- #{branch} (skipped)"
+  puts "    git merge #{branch}; git mergetool"
 end
 
 
